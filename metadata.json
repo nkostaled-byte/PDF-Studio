@@ -1,0 +1,6 @@
+{
+  "name": "PDF Studio",
+  "description": "Client-side browser PDF SaaS platform for merging, splitting, compressing, and converting PDFs with Paystack & Firebase integration.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
