@@ -1,0 +1,63 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default-deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidUserProfile(data) {
+      return data.uid is string && data.uid.size() <= 128 &&
+             data.email is string && data.email.size() <= 256 &&
+             data.plan in ['free', 'pro'] &&
+             (!('displayName' in data) || (data.displayName is string && data.displayName.size() <= 128)) &&
+             (!('subscriptionDate' in data) || (data.subscriptionDate is string && data.subscriptionDate.size() <= 100)) &&
+             (!('paystackRef' in data) || (data.paystackRef is string && data.paystackRef.size() <= 128)) &&
+             (!('totalFilesProcessed' in data) || (data.totalFilesProcessed is number)) &&
+             (!('totalMbProcessed' in data) || (data.totalMbProcessed is number)) &&
+             (!('createdAt' in data) || (data.createdAt is string && data.createdAt.size() <= 100));
+    }
+
+    function isValidHistoryItem(data) {
+      return data.tool in ['merge', 'split', 'compress', 'img2pdf'] &&
+             data.fileName is string && data.fileName.size() <= 256 &&
+             data.originalSize is number &&
+             data.timestamp is number &&
+             (!('createdAt' in data) || (data.createdAt is string && data.createdAt.size() <= 100));
+    }
+
+    match /users/{userId} {
+      allow get: if isOwner(userId) && isValidId(userId);
+      allow create: if isOwner(userId) && isValidId(userId) && isValidUserProfile(incoming()) && incoming().uid == request.auth.uid;
+      allow update: if isOwner(userId) && isValidId(userId) && isValidUserProfile(incoming()) && incoming().uid == existing().uid;
+      allow delete: if false;
+
+      match /history/{historyId} {
+        allow get, list: if isOwner(userId) && isValidId(userId);
+        allow create: if isOwner(userId) && isValidId(userId) && isValidHistoryItem(incoming());
+        allow update, delete: if false;
+      }
+    }
+  }
+}
